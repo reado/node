@@ -287,7 +287,7 @@ bool FullCodeGenerator::MakeCode(CompilationInfo* info) {
   const int kInitialBufferSize = 4 * KB;
   MacroAssembler masm(NULL, kInitialBufferSize);
 #ifdef ENABLE_GDBJIT_INTERFACE
-  masm.positions_recorder()->start_gdbjit_line_info_recording();
+  masm.positions_recorder()->StartGDBJITLineInfoRecording();
 #endif
 
   FullCodeGenerator cgen(&masm);
@@ -310,7 +310,7 @@ bool FullCodeGenerator::MakeCode(CompilationInfo* info) {
 #ifdef ENABLE_GDBJIT_INTERFACE
   if (!code.is_null()) {
     GDBJITLineInfo* lineinfo =
-        masm.positions_recorder()->detach_gdbjit_line_info();
+        masm.positions_recorder()->DetachGDBJITLineInfo();
 
     GDBJIT(RegisterDetailedLineInfo(*code, lineinfo));
   }

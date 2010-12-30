@@ -877,7 +877,7 @@ def VerifyOptions(env):
     return False
   if env['os'] == 'win32' and env['library'] == 'shared' and env['prof'] == 'on':
     Abort("Profiling on windows only supported for static library.")
-  if env['gdbjit'] == 'on' and (env['os'] != 'linux' or env['arch'] != 'ia32'):
+  if env['gdbjit'] == 'on' and (env['os'] != 'linux' or (env['arch'] != 'ia32' and env['arch'] != 'x64')):
     Abort("GDBJIT interface is supported only for 32-bit Linux target.")
   if env['prof'] == 'oprofile' and env['os'] != 'linux':
     Abort("OProfile is only supported on Linux.")

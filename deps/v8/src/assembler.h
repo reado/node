@@ -644,13 +644,13 @@ class PositionsRecorder BASE_EMBEDDED {
     delete gdbjit_lineinfo_;
   }
 
-  void start_gdbjit_line_info_recording() {
+  void StartGDBJITLineInfoRecording() {
     if (FLAG_gdbjit) {
       gdbjit_lineinfo_ = new GDBJITLineInfo();
     }
   }
 
-  GDBJITLineInfo* detach_gdbjit_line_info() {
+  GDBJITLineInfo* DetachGDBJITLineInfo() {
     GDBJITLineInfo* lineinfo = gdbjit_lineinfo_;
     gdbjit_lineinfo_ = NULL;  // To prevent deallocation in destructor.
     return lineinfo;

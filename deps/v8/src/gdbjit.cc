@@ -394,11 +394,23 @@ class ELF BASE_EMBEDDED {
   void WriteHeader(Writer* w) {
     ASSERT(w->position() == 0);
     Writer::Slot<ELFHeader> header = w->SlotHere<ELFHeader>();
+#if defined(V8_TARGET_ARCH_IA32)
     const uint8_t ident[16] =
         { 0x7f, 'E', 'L', 'F', 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+#elif defined(V8_TARGET_ARCH_X64)
+    const uint8_t ident[16] =
+        { 0x7f, 'E', 'L', 'F', 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+#endif
     memcpy(header->ident, ident, 16);
     header->type = 1;
+#if defined(V8_TARGET_ARCH_IA32)
     header->machine = 3;
+#elif defined(V8_TARGET_ARCH_X64)
+    // Processor identification value for x64 is 62 as defined in
+    //    System V ABI, AMD64 Supplement
+    //    http://www.x86-64.org/documentation/abi.pdf
+    header->machine = 62;
+#endif
     header->version = 1;
     header->entry = 0;
     header->pht_offset = 0;
@@ -474,7 +486,7 @@ struct ELFSymbol BASE_EMBEDDED {
             Binding binding,
             Type type,
             uint16_t section)
-      : name(reinterpret_cast<uint32_t>(name)),
+      : name(name),
         value(value),
         size(size),
         info((binding << 4) | type),
@@ -486,7 +498,52 @@ struct ELFSymbol BASE_EMBEDDED {
     return static_cast<Binding>(info >> 4);
   }
 
-  uint32_t name;
+#if defined(V8_TARGET_ARCH_IA32)
+
+    uint32_t name;
+    uintptr_t value;
+    uintptr_t size;
+    uint8_t info;
+    uint8_t other;
+    uint16_t section;
+  };
+#elif defined(V8_TARGET_ARCH_X64)
+  struct SerializedLayout {
+    SerializedLayout(uint32_t name,
+                     uintptr_t value,
+                     uintptr_t size,
+                     Binding binding,
+                     Type type,
+                     uint16_t section)
+        : name(name),
+          info((binding << 4) | type),
+          other(0),
+          section(section),
+          value(value),
+          size(size) {
+    }
+
+    uint32_t name;
+    uint8_t info;
+    uint8_t other;
+    uint16_t section;
+    uintptr_t value;
+    uintptr_t size;
+  };
+#endif
+
+  void Write(Writer::Slot<SerializedLayout> s, StringTable* t) {
+    // Convert symbol names from strings to indexes in the string table.
+    s->name = t->Add(name);
+    s->value = value;
+    s->size = size;
+    s->info = info;
+    s->other = other;
+    s->section = section;
+  }
+
+ private:
+  const char* name;
   uintptr_t value;
   uintptr_t size;
   uint8_t info;
@@ -505,23 +562,24 @@ class ELFSymbolTable : public ELFSection {
 
   virtual void WriteBody(Writer::Slot<Header> header, Writer* w) {
     w->Align(header->alignment);
+    int total_symbols = locals_.length() + globals_.length() + 1;
     header->offset = w->position();
-    header->size =
-        sizeof(ELFSymbol) * (locals_.length() + globals_.length() + 1);
 
-    Writer::Slot<ELFSymbol> symbols =
-        w->SlotsHere<ELFSymbol>(locals_.length() + globals_.length() + 1);
+    Writer::Slot<ELFSymbol::SerializedLayout> symbols =
+        w->SlotsHere<ELFSymbol::SerializedLayout>(total_symbols);
+
+    header->size = w->position() - header->offset;
 
     // String table for this symbol table should follow it in the section table.
     StringTable* strtab =
         static_cast<StringTable*>(w->elf()->SectionAt(index() + 1));
     strtab->AttachWriter(w);
-    symbols.at(0).set(ELFSymbol(0,
-                                0,
-                                0,
-                                ELFSymbol::BIND_LOCAL,
-                                ELFSymbol::TYPE_NOTYPE,
-                                0));
+    symbols.at(0).set(ELFSymbol::SerializedLayout(0,
+                                                  0,
+                                                  0,
+                                                  ELFSymbol::BIND_LOCAL,
+                                                  ELFSymbol::TYPE_NOTYPE,
+                                                  0));
     WriteSymbolsList(&locals_, symbols.at(1), strtab);
     WriteSymbolsList(&globals_, symbols.at(locals_.length() + 1), strtab);
     strtab->DetachWriter();
@@ -541,20 +599,17 @@ class ELFSymbolTable : public ELFSection {
     // We are assuming that string table will follow symbol table.
     header->link = index() + 1;
     header->info = locals_.length() + 1;
-    header->entry_size = sizeof(ELFSymbol);
+    header->entry_size = sizeof(ELFSymbol::SerializedLayout);
   }
 
  private:
   void WriteSymbolsList(const ZoneList<ELFSymbol>* src,
-                        Writer::Slot<ELFSymbol> dst,
+                        Writer::Slot<ELFSymbol::SerializedLayout> dst,
                         StringTable* strtab) {
     for (int i = 0, len = src->length();
          i < len;
          i++) {
-      // Convert symbol names from strings to indexes in the string table.
-      src->at(i).name =
-          strtab->Add(reinterpret_cast<const char*>(src->at(i).name));
-      dst.at(i).set(src->at(i));
+      src->at(i).Write(dst.at(i), strtab);
     }
   }
 
@@ -787,7 +842,7 @@ class DebugLineSection : public ELFSection {
         w->Write<uint8_t>(DW_LNS_NEGATE_STMT);
         is_statement = !is_statement;
       }
-      if (pc_diff != 0) {
+      if (pc_diff != 0 || i == 0) {
         w->Write<uint8_t>(DW_LNS_COPY);
       }
     }
@@ -845,7 +900,9 @@ extern "C" {
   };
 
   /* GDB puts a breakpoint in this function.  */
-  void __attribute__((noinline)) __jit_debug_register_code() { }
+  void __attribute__((noinline)) __jit_debug_register_code() {
+    __asm__ ("");
+  }
 
   /* Make sure to specify the version statically, because the
      debugger may check the version before we can set it.  */
@@ -910,7 +967,7 @@ static jit_code_entry* CreateELFObject(CodeDescription* desc) {
   int text_section_index = elf.AddSection(
       new FullHeaderELFSection(".text",
                                ELFSection::TYPE_NOBITS,
-                               16,
+                               kCodeAlignment,
                                desc->code_start(),
                                0,
                                desc->code_size(),
@@ -932,9 +989,9 @@ static bool SameCodeObjects(void* key1, void* key2) {
 static HashMap entries(&SameCodeObjects);
 
 static uint32_t HashForCodeObject(Code* code) {
-  static const uint32_t kGoldenRatio = 2654435761u;
-  uint32_t hash = reinterpret_cast<uint32_t>(code->address());
-  return (hash >> kCodeAlignmentBits) * kGoldenRatio;
+  static const uintptr_t kGoldenRatio = 2654435761u;
+  uintptr_t hash = reinterpret_cast<uintptr_t>(code->address());
+  return static_cast<uint32_t>((hash >> kCodeAlignmentBits) * kGoldenRatio);
 }
 
 static const intptr_t kLineInfoTag = 0x1;
@@ -987,6 +1044,12 @@ void GDBJITInterface::AddCode(const char* name,
                             script != NULL ? Handle<Script>(script)
                                            : Handle<Script>(),
                             lineinfo);
+
+  if (!FLAG_gdbjit_full && !code_desc.is_line_info_available()) {
+    delete lineinfo;
+    entries.Remove(code, HashForCodeObject(code));
+    return;
+  }
 
   jit_code_entry* entry = CreateELFObject(&code_desc);
   ASSERT(!IsLineInfoTagged(entry));

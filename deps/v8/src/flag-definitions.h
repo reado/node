@@ -356,6 +356,10 @@ DEFINE_string(map_counters, NULL, "Map counters to a file")
 DEFINE_args(js_arguments, JSArguments(),
             "Pass all remaining arguments to the script. Alias for \"--\".")
 
+
+DEFINE_bool(gdbjit, false, "enable GDBJIT interface")
+DEFINE_bool(gdbjit_full, false, "enable GDBJIT interface for all code objects")
+
 //
 // Debug only flags
 //
@@ -394,8 +398,6 @@ DEFINE_bool(print_graph_text, false,
 
 // contexts.cc
 DEFINE_bool(trace_contexts, false, "trace contexts operations")
-
-DEFINE_bool(gdbjit, false, "enable GDBJIT interface")
 
 // heap.cc
 DEFINE_bool(gc_greedy, false, "perform GC prior to some allocations")
