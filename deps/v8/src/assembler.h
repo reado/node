@@ -35,6 +35,7 @@
 #ifndef V8_ASSEMBLER_H_
 #define V8_ASSEMBLER_H_
 
+#include "gdbjit.h"
 #include "runtime.h"
 #include "top.h"
 #include "token.h"
@@ -632,7 +633,29 @@ struct PositionState {
 class PositionsRecorder BASE_EMBEDDED {
  public:
   explicit PositionsRecorder(Assembler* assembler)
-      : assembler_(assembler) {}
+      : assembler_(assembler) {
+#ifdef ENABLE_GDBJIT_INTERFACE
+    gdbjit_lineinfo_ = NULL;
+#endif
+  }
+
+#ifdef ENABLE_GDBJIT_INTERFACE
+  ~PositionsRecorder() {
+    delete gdbjit_lineinfo_;
+  }
+
+  void start_gdbjit_line_info_recording() {
+    if (FLAG_gdbjit) {
+      gdbjit_lineinfo_ = new GDBJITLineInfo();
+    }
+  }
+
+  GDBJITLineInfo* detach_gdbjit_line_info() {
+    GDBJITLineInfo* lineinfo = gdbjit_lineinfo_;
+    gdbjit_lineinfo_ = NULL;  // To prevent deallocation in destructor.
+    return lineinfo;
+  }
+#endif
 
   // Set current position to pos.
   void RecordPosition(int pos);
@@ -652,6 +675,9 @@ class PositionsRecorder BASE_EMBEDDED {
  private:
   Assembler* assembler_;
   PositionState state_;
+#ifdef ENABLE_GDBJIT_INTERFACE
+  GDBJITLineInfo* gdbjit_lineinfo_;
+#endif
 
   friend class PreservePositionScope;
 

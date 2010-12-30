@@ -31,6 +31,7 @@
 #include "arguments.h"
 #include "bootstrapper.h"
 #include "builtins.h"
+#include "gdbjit.h"
 #include "ic-inl.h"
 #include "vm-state-inl.h"
 
@@ -1563,7 +1564,11 @@ void Builtins::Setup(bool create_heap_objects) {
       }
       // Log the event and add the code to the builtins array.
       PROFILE(CodeCreateEvent(Logger::BUILTIN_TAG,
-                              Code::cast(code), functions[i].s_name));
+                              Code::cast(code),
+                              functions[i].s_name));
+      GDBJIT(AddCode(GDBJITInterface::BUILTIN,
+                     functions[i].s_name,
+                     Code::cast(code)));
       builtins_[i] = code;
 #ifdef ENABLE_DISASSEMBLER
       if (FLAG_print_builtin_code) {

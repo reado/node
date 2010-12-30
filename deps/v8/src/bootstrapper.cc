@@ -33,6 +33,7 @@
 #include "compiler.h"
 #include "debug.h"
 #include "execution.h"
+#include "gdbjit.h"
 #include "global-handles.h"
 #include "macro-assembler.h"
 #include "natives.h"

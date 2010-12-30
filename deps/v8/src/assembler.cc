@@ -905,6 +905,11 @@ void PositionsRecorder::RecordPosition(int pos) {
   ASSERT(pos != RelocInfo::kNoPosition);
   ASSERT(pos >= 0);
   state_.current_position = pos;
+#ifdef ENABLE_GDBJIT_INTERFACE
+  if (gdbjit_lineinfo_ != NULL) {
+    gdbjit_lineinfo_->SetPosition(assembler_->pc_offset(), pos, false);
+  }
+#endif
 }
 
 
@@ -912,6 +917,11 @@ void PositionsRecorder::RecordStatementPosition(int pos) {
   ASSERT(pos != RelocInfo::kNoPosition);
   ASSERT(pos >= 0);
   state_.current_statement_position = pos;
+#ifdef ENABLE_GDBJIT_INTERFACE
+  if (gdbjit_lineinfo_ != NULL) {
+    gdbjit_lineinfo_->SetPosition(assembler_->pc_offset(), pos, true);
+  }
+#endif
 }
 
 

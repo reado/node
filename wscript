@@ -445,7 +445,7 @@ def v8_cmd(bld, variant):
   else:
     profile = ""
 
-  cmd_R = sys.executable + ' "%s" -j %d -C "%s" -Y "%s" visibility=default mode=%s %s library=static %s %s'
+  cmd_R = sys.executable + ' "%s" -j %d -C "%s" -Y "%s" gdbjit=on visibility=default mode=%s %s library=static %s %s'
 
   cmd = cmd_R % ( scons
                 , Options.options.jobs
