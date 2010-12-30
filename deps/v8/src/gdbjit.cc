@@ -499,6 +499,20 @@ struct ELFSymbol BASE_EMBEDDED {
   }
 
 #if defined(V8_TARGET_ARCH_IA32)
+  struct SerializedLayout {
+    SerializedLayout(uint32_t name,
+                     uintptr_t value,
+                     uintptr_t size,
+                     Binding binding,
+                     Type type,
+                     uint16_t section)
+        : name(name),
+          value(value),
+          size(size),
+          info((binding << 4) | type),
+          other(0),
+          section(section) {
+    }
 
     uint32_t name;
     uintptr_t value;
